@@ -4,120 +4,139 @@ import (
 	"fmt"
 	"os"
 
-	"encoding/json"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"errors"
 	"github.com/tskinn/envi-cli/store"
 	"github.com/urfave/cli"
 )
 
 func main() {
+	var tableName, awsRegion, application, environment, id, variables string
 	app := cli.NewApp()
 
 	app.Description = "A simple key-value store cli for dynamodb"
 	app.Name = "envi"
 	app.Usage = ""
-	app.UsageText = "envi --put --key <key> --value <value>\n   envi --get --key <key>\n   envi --getall --key <key>"
+	app.UsageText = "envi save --application myapp --environment dev --variables=one=eno,two=owt,three=eerht\n   envi --get --key <key>\n   envi --getall --key <key>"
 
-	app.Flags = []cli.Flag{
+	globalFlags := []cli.Flag{
 		cli.StringFlag{
-			Name:  "output",
-			Value: "text",
-			Usage: "json | text. only for getall option",
-		},
-		cli.StringFlag{
-			Name:  "region",
-			Value: "us-east-1",
-			Usage: "aws region in which the dynamodb table resides",
+			Name:        "table, t",
+			Value:       "envi",
+			Usage:       "name of the dynamodb to store values",
+			Destination: &tableName,
 		},
 		cli.StringFlag{
-			Name:  "table",
-			Value: "envi",
-			Usage: "name of the dynamodb table used for envi",
+			Name:        "region, r",
+			Value:       "us-east-1",
+			Usage:       "name of the aws region in which dynamodb table resides",
+			Destination: &awsRegion,
 		},
 		cli.StringFlag{
-			Name:  "key",
-			Value: "",
-			Usage: "key to store in dynamodb",
+			Name:        "id, i",
+			Value:       "",
+			Usage:       "id of the application environment combo; if id is not provided then application__environment is used as the id",
+			Destination: &id,
 		},
 		cli.StringFlag{
-			Name:  "value",
-			Value: "",
-			Usage: "value of the value to be stored",
+			Name:        "application, a",
+			Value:       "",
+			Usage:       "name of the application",
+			Destination: &application,
 		},
-		cli.BoolFlag{
-			Name:  "get",
-			Usage: "get the value of the given key",
-		},
-		cli.BoolFlag{
-			Name:  "getall",
-			Usage: "get all the keys with the prefix of key",
-		},
-		cli.BoolFlag{
-			Name:  "put",
-			Usage: "put the key value pair in the cluster",
+		cli.StringFlag{
+			Name:        "environment, e",
+			Value:       "",
+			Usage:       "name of the environment",
+			Destination: &environment,
 		},
 	}
 
-	app.Action = func(c *cli.Context) error {
-		var err error
-		sess := session.Must(session.NewSession(&aws.Config{Region: aws.String(c.String("region"))}))
-		db := dynamodb.New(sess)
-		if c.Bool("get") && c.String("key") != "" {
-			// get the key!
-			value := store.Get(db, c.String("table"), c.String("key"))
-			if value != "" {
-				print(c.String("output"), []string{c.String("key")}, []string{value})
+	saveCommand := cli.Command{
+		Name:    "save",
+		Aliases: []string{"s"},
+		Usage:   "save application configuraton in dynamodb",
+		Action: func(c *cli.Context) error {
+			store.Init(c.String("region"), c.String("table"))
+			if c.IsSet("application") && c.IsSet("environment") && c.IsSet("variables") {
+				tID := c.String("id")
+				if !c.IsSet("id") {
+					tID = c.String("application") + "__" + c.String("environment")
+				}
+				return store.Save(tID, c.String("application"), c.String("environment"), c.String("variables"))
 			}
-		}
-		if c.Bool("getall") && c.String("key") != "" {
-			// get all keys-values under key
-			keys, values := store.GetAll(db, c.String("table"), c.String("key"))
-			print(c.String("output"), keys, values)
-		}
-		if c.Bool("put") && c.String("value") != "" && c.String("key") != "" {
-			// put the key-value!
-			err = store.Put(db, c.String("table"), c.String("key"), c.String("value"))
-			if err != nil {
-				fmt.Println("failed to put key-value")
+			return nil
+		},
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:        "variables, v",
+				Value:       "",
+				Usage:       "env variables to store in the form of key=value,key2=value2,key3=value3",
+				Destination: &variables,
+			},
+		},
+	}
+	saveCommand.Flags = append(saveCommand.Flags, globalFlags...)
+
+	getCommand := cli.Command{
+		Name:    "get",
+		Aliases: []string{"g"},
+		Usage:   "get the application configuration for a particular application",
+		Action: func(c *cli.Context) error {
+			store.Init(c.String("region"), c.String("table"))
+			var item store.Item
+			var err error
+			if c.IsSet("id") {
+				item, err = store.Get(c.String("id"))
+			} else if c.IsSet("application") && c.IsSet("environment") {
+				item, err = store.Get(c.String("application") + "__" + c.String("environment"))
 			} else {
-				fmt.Printf("Successfully put key-value:\n\t%s:\t%s\n", c.String("key"), c.String("value"))
+				return errors.New("incorrect flags")
 			}
-		}
-		return err
+			if err != nil {
+				return err
+			}
+			fmt.Println(item.String())
+			return nil
+		},
+		Flags: []cli.Flag{},
+	}
+	getCommand.Flags = append(getCommand.Flags, globalFlags...)
+
+	app.Commands = []cli.Command{
+		saveCommand,
+		getCommand,
 	}
 
 	app.Run(os.Args)
 }
 
-func print(output string, keys, values []string) {
-	switch output {
-	case "json":
-		printJSON(keys, values)
-	case "text":
-		printText(keys, values)
-	default:
-		printText(keys, values)
-	}
-}
+// func print(output string, keys, values []string) {
+// 	switch output {
+// 	case "json":
+// 		printJSON(keys, values)
+// 	case "text":
+// 		printText(keys, values)
+// 	default:
+// 		printText(keys, values)
+// 	}
+// }
 
-func printJSON(keys, values []string) {
-	list := make([]map[string]string, 0)
-	for i := 0; i < len(keys); i++ {
-		tmp := map[string]string{"key": keys[i], "value": values[i]}
-		list = append(list, tmp)
-	}
-	raw, err := json.Marshal(list)
-	if err != nil {
-		// print something
-		return
-	}
-	fmt.Printf("%s", raw)
-}
+// func printJSON(keys, values []string) {
+// 	list := make([]map[string]string, 0)
+// 	for i := 0; i < len(keys); i++ {
+// 		tmp := map[string]string{"key": keys[i], "value": values[i]}
+// 		list = append(list, tmp)
+// 	}
+// 	raw, err := json.Marshal(list)
+// 	if err != nil {
+// 		// print something
+// 		return
+// 	}
+// 	fmt.Printf("%s", raw)
+// }
 
-func printText(keys, values []string) {
-	for i := 0; i < len(keys); i++ {
-		fmt.Printf("%s=%s\n", keys[i], values[i])
-	}
-}
+// func printText(keys, values []string) {
+// 	for i := 0; i < len(keys); i++ {
+// 		fmt.Printf("%s=%s\n", keys[i], values[i])
+// 	}
+// }

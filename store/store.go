@@ -2,14 +2,52 @@ package store
 
 import (
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"strings"
+)
+
+var (
+	region    string
+	tableName string
+	db        *dynamodb.DynamoDB
 )
 
 // DynamodbItem is not what we want?
 type DynamodbItem struct {
 	Key   string `dynamodbav:"key"`
 	Value string `dynamodbav:"value"`
+}
+
+// Init inits some mstuff
+func Init(regionName, table string) {
+	region = regionName
+	tableName = table
+	sesh := session.Must(session.NewSession(&aws.Config{Region: aws.String(region)}))
+	db = dynamodb.New(sesh)
+}
+
+// Get gets the thing ok
+func Get(id string) (item Item, err error) {
+	params := &dynamodb.GetItemInput{
+		TableName: aws.String(tableName),
+		Key: map[string]*dynamodb.AttributeValue{
+			"id": {
+				S: aws.String(id),
+			},
+		},
+	}
+	resp, err := db.GetItem(params)
+	if err != nil {
+		return
+	}
+	err = dynamodbattribute.UnmarshalMap(resp.Item, &item)
+	if err != nil {
+		return
+	}
+	item.decode()
+	return
 }
 
 func Put(db *dynamodb.DynamoDB, table, key, value string) error {
@@ -28,7 +66,7 @@ func Put(db *dynamodb.DynamoDB, table, key, value string) error {
 	return err
 }
 
-func Get(db *dynamodb.DynamoDB, cluster, key string) string {
+func get(db *dynamodb.DynamoDB, cluster, key string) string {
 	params := &dynamodb.GetItemInput{
 		Key: map[string]*dynamodb.AttributeValue{
 			"key": {
@@ -81,4 +119,18 @@ func scan(db *dynamodb.DynamoDB, table string) ([]map[string]*dynamodb.Attribute
 		return nil, err
 	}
 	return items, nil
+}
+
+func Save(id, app, env, vars string) error {
+	item := CreateItem(id, app, env, vars)
+	atr, err := dynamodbattribute.MarshalMap(item)
+	if err != nil {
+		return err
+	}
+	params := &dynamodb.PutItemInput{
+		TableName: aws.String(tableName),
+		Item:      atr,
+	}
+	_, err = db.PutItem(params)
+	return err
 }
