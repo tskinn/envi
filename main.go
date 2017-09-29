@@ -57,20 +57,21 @@ func main() {
 		Usage:   "save application configuraton in dynamodb",
 		Action: func(c *cli.Context) error {
 			store.Init(c.String("region"), c.String("table"))
-			if c.IsSet("application") && c.IsSet("environment") && c.IsSet("variables") {
+			if c.IsSet("application") && c.IsSet("environment") && (c.IsSet("variables") || c.IsSet("file")) {
 				tID := c.String("id")
 				if !c.IsSet("id") {
-					tID = c.String("application") + "__" + c.String("environment")
+					tID = application + "__" + environment
 				}
 				if filePath != "" && variables != "" {
+					fmt.Println("Cannot do that")
 					// TODO print error not supposed to have both set at same time
 				} else if filePath != "" {
 					return store.SaveFromFile(tID, application, environment, filePath)
 				} else if variables != "" {
 					return store.Save(tID, application, environment, variables)
 				}
+				return fmt.Errorf("Bad form")
 				// TODO return error because neither was set
-				return store.Save(tID, c.String("application"), c.String("environment"), c.String("variables"))
 			}
 			return nil
 		},
@@ -121,7 +122,10 @@ func main() {
 		getCommand,
 	}
 
-	app.Run(os.Args)
+	err := app.Run(os.Args)
+	if err != nil {
+		fmt.Println(err)
+	}
 }
 
 // func print(output string, keys, values []string) {

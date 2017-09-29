@@ -1,8 +1,10 @@
 package store
 
 import (
+	"bufio"
 	"encoding/base64"
 	"encoding/json"
+	"os"
 	"strings"
 )
 
@@ -36,7 +38,31 @@ func parseVariables(variables string) []Variable {
 }
 
 func parseVariablesFromFile(fileName string) ([]Variable, error) {
-	return nil, nil
+	variables := make([]Variable, 0)
+	file, err := os.Open(fileName)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		// Parse line
+		line := scanner.Text()
+		line = strings.TrimPrefix(line, "export") // remove export if exists
+		line = strings.TrimLeft(line, " \t")      // remove all spaces on left
+		words := strings.SplitN(line, "=", 2)
+		if len(words) != 2 {
+			// Skip. Something went wrong
+			// TODO do we want to print an error?
+			continue
+		}
+		variables = append(variables, Variable{Name: words[0], Value: words[1]})
+	}
+	if err = scanner.Err(); err != nil {
+		return variables, err
+	}
+	return variables, nil
 }
 
 // CreateItem creates an item

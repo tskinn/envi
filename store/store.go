@@ -121,12 +121,14 @@ func scan(db *dynamodb.DynamoDB, table string) ([]map[string]*dynamodb.Attribute
 	return items, nil
 }
 
+// Save saves env vars given a string of vars in form of this=that,this2=that2
 func Save(id, app, env, vars string) error {
 	variables := parseVariables(vars)
 	item := CreateItem(id, app, env, variables)
 	return save(item)
 }
 
+// SaveFromFile gets env vars from a env file and saves to dynamo
 func SaveFromFile(id, app, env, fileName string) error {
 	variables, err := parseVariablesFromFile(fileName)
 	if err != nil {
