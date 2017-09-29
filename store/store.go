@@ -122,7 +122,21 @@ func scan(db *dynamodb.DynamoDB, table string) ([]map[string]*dynamodb.Attribute
 }
 
 func Save(id, app, env, vars string) error {
-	item := CreateItem(id, app, env, vars)
+	variables := parseVariables(vars)
+	item := CreateItem(id, app, env, variables)
+	return save(item)
+}
+
+func SaveFromFile(id, app, env, fileName string) error {
+	variables, err := parseVariablesFromFile(fileName)
+	if err != nil {
+		return err
+	}
+	item := CreateItem(id, app, env, variables)
+	return save(item)
+}
+
+func save(item Item) error {
 	atr, err := dynamodbattribute.MarshalMap(item)
 	if err != nil {
 		return err

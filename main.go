@@ -1,22 +1,22 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
-	"errors"
 	"github.com/tskinn/envi-cli/store"
 	"github.com/urfave/cli"
 )
 
 func main() {
-	var tableName, awsRegion, application, environment, id, variables string
+	var tableName, awsRegion, application, environment, id, variables, filePath string
 	app := cli.NewApp()
 
 	app.Description = "A simple key-value store cli for dynamodb"
 	app.Name = "envi"
 	app.Usage = ""
-	app.UsageText = "envi save --application myapp --environment dev --variables=one=eno,two=owt,three=eerht\n   envi --get --key <key>\n   envi --getall --key <key>"
+	app.UsageText = "envi set --application myapp --environment dev --variables=one=eno,two=owt,three=eerht\n   envi get --key <key>\n   envi --getall --key <key>"
 
 	globalFlags := []cli.Flag{
 		cli.StringFlag{
@@ -51,8 +51,8 @@ func main() {
 		},
 	}
 
-	saveCommand := cli.Command{
-		Name:    "save",
+	setCommand := cli.Command{
+		Name:    "set",
 		Aliases: []string{"s"},
 		Usage:   "save application configuraton in dynamodb",
 		Action: func(c *cli.Context) error {
@@ -62,6 +62,14 @@ func main() {
 				if !c.IsSet("id") {
 					tID = c.String("application") + "__" + c.String("environment")
 				}
+				if filePath != "" && variables != "" {
+					// TODO print error not supposed to have both set at same time
+				} else if filePath != "" {
+					return store.SaveFromFile(tID, application, environment, filePath)
+				} else if variables != "" {
+					return store.Save(tID, application, environment, variables)
+				}
+				// TODO return error because neither was set
 				return store.Save(tID, c.String("application"), c.String("environment"), c.String("variables"))
 			}
 			return nil
@@ -73,9 +81,15 @@ func main() {
 				Usage:       "env variables to store in the form of key=value,key2=value2,key3=value3",
 				Destination: &variables,
 			},
+			cli.StringFlag{
+				Name:        "file, f",
+				Value:       "",
+				Usage:       "path to a shell file that exports env vars",
+				Destination: &filePath,
+			},
 		},
 	}
-	saveCommand.Flags = append(saveCommand.Flags, globalFlags...)
+	setCommand.Flags = append(setCommand.Flags, globalFlags...)
 
 	getCommand := cli.Command{
 		Name:    "get",
@@ -103,7 +117,7 @@ func main() {
 	getCommand.Flags = append(getCommand.Flags, globalFlags...)
 
 	app.Commands = []cli.Command{
-		saveCommand,
+		setCommand,
 		getCommand,
 	}
 

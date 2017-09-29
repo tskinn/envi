@@ -35,13 +35,17 @@ func parseVariables(variables string) []Variable {
 	return vars
 }
 
+func parseVariablesFromFile(fileName string) ([]Variable, error) {
+	return nil, nil
+}
+
 // CreateItem creates an item
-func CreateItem(id, application, environment, variables string) Item {
+func CreateItem(id, application, environment string, variables []Variable) Item {
 	return Item{
 		ID:          id,
 		Application: application,
 		Environment: environment,
-		Variables:   parseVariables(variables),
+		Variables:   variables,
 	}
 }
 
