@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 )
@@ -20,6 +21,13 @@ type Item struct {
 	Application string     `dynamodbav:"application" json:"application"`
 	Environment string     `dynamodbav:"environment" json:"environment"`
 	Variables   []Variable `dynamodbav:"variables" json:"variables"`
+}
+
+// PrintVars prints the variables in the item
+func (item *Item) PrintVars() {
+	for i := range item.Variables {
+		fmt.Printf("%s=%s\n", item.Variables[i].Name, item.Variables[i].Value)
+	}
 }
 
 // TODO this is pretty darn primitive so make it more robust
@@ -87,5 +95,12 @@ func (i *Item) decode() {
 		if err == nil {
 			i.Variables[j].Value = string(tmp)
 		}
+	}
+}
+
+func (i *Item) encode() {
+	for j := range i.Variables {
+		tmp := base64.StdEncoding.EncodeToString([]byte(i.Variables[j].Value))
+		i.Variables[j].Value = tmp
 	}
 }

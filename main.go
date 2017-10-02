@@ -110,7 +110,7 @@ func main() {
 			if err != nil {
 				return err
 			}
-			fmt.Println(item.String())
+			item.PrintVars()
 			return nil
 		},
 		Flags: []cli.Flag{},
@@ -127,34 +127,3 @@ func main() {
 		fmt.Println(err)
 	}
 }
-
-// func print(output string, keys, values []string) {
-// 	switch output {
-// 	case "json":
-// 		printJSON(keys, values)
-// 	case "text":
-// 		printText(keys, values)
-// 	default:
-// 		printText(keys, values)
-// 	}
-// }
-
-// func printJSON(keys, values []string) {
-// 	list := make([]map[string]string, 0)
-// 	for i := 0; i < len(keys); i++ {
-// 		tmp := map[string]string{"key": keys[i], "value": values[i]}
-// 		list = append(list, tmp)
-// 	}
-// 	raw, err := json.Marshal(list)
-// 	if err != nil {
-// 		// print something
-// 		return
-// 	}
-// 	fmt.Printf("%s", raw)
-// }
-
-// func printText(keys, values []string) {
-// 	for i := 0; i < len(keys); i++ {
-// 		fmt.Printf("%s=%s\n", keys[i], values[i])
-// 	}
-// }

@@ -135,6 +135,7 @@ func SaveFromFile(id, app, env, fileName string) error {
 		return err
 	}
 	item := CreateItem(id, app, env, variables)
+	item.encode()
 	return save(item)
 }
 
