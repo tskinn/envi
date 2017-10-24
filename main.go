@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	var tableName, awsRegion, application, environment, id, variables, filePath string
+	var tableName, awsRegion, application, environment, id, variables, filePath, output string
 	app := cli.NewApp()
 
 	app.Description = "A simple key-value store cli for dynamodb"
@@ -110,10 +110,17 @@ func main() {
 			if err != nil {
 				return err
 			}
-			item.PrintVars()
+			item.PrintVars(output)
 			return nil
 		},
-		Flags: []cli.Flag{},
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:        "output, o",
+				Value:       "text",
+				Usage:       "format of the output of the variables",
+				Destination: &output,
+			},
+		},
 	}
 	getCommand.Flags = append(getCommand.Flags, globalFlags...)
 

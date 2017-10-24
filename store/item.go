@@ -24,10 +24,28 @@ type Item struct {
 }
 
 // PrintVars prints the variables in the item
-func (item *Item) PrintVars() {
+func (item *Item) PrintVars(format string) {
+	format = strings.ToLower(format)
+	if format == "json" {
+		item.printJSON()
+	} else {
+		item.printPlain()
+	}
+}
+
+func (item *Item) printPlain() {
 	for i := range item.Variables {
 		fmt.Printf("%s=%s\n", item.Variables[i].Name, item.Variables[i].Value)
 	}
+}
+
+func (item *Item) printJSON() {
+	vars, err := json.MarshalIndent(item.Variables, "", "   ")
+	if err != nil {
+		// TODO debug print error or something
+		fmt.Println("ERROR: ", err)
+	}
+	fmt.Println(string(vars))
 }
 
 // TODO this is pretty darn primitive so make it more robust
