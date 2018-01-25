@@ -57,7 +57,7 @@ func parseVariables(variables string) []Variable {
 		j := strings.Index(split[i], "=")
 		vars[i] = Variable{
 			Name:  string(split[i][:j]),
-			Value: base64.StdEncoding.EncodeToString([]byte(split[i][j+1:])),
+			Value: string(split[i][j+1:]),
 		}
 	}
 	return vars
@@ -78,7 +78,7 @@ func parseVariablesFromFile(fileName string) ([]Variable, error) {
 		line = strings.TrimPrefix(line, "export") // remove export if exists
 		line = strings.TrimLeft(line, " \t")      // remove all spaces on left
 		words := strings.SplitN(line, "=", 2)
-		if len(words) != 2 {
+		if len(words) == 2 {
 			// Skip. Something went wrong
 			// TODO do we want to print an error?
 			continue
@@ -108,6 +108,7 @@ func (i *Item) String() string {
 
 // attempt to decode the Variable values from base64
 func (i *Item) decode() {
+	fmt.Println("decoding")
 	for j := range i.Variables {
 		tmp, err := base64.StdEncoding.DecodeString(i.Variables[j].Value)
 		if err == nil {
@@ -117,6 +118,7 @@ func (i *Item) decode() {
 }
 
 func (i *Item) encode() {
+	fmt.Println("encoding")
 	for j := range i.Variables {
 		tmp := base64.StdEncoding.EncodeToString([]byte(i.Variables[j].Value))
 		i.Variables[j].Value = tmp

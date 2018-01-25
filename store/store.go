@@ -5,7 +5,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
-	"strings"
 )
 
 var (
@@ -29,7 +28,13 @@ func Init(regionName, table string) {
 }
 
 // Get gets the thing ok
-func Get(id string) (item Item, err error) {
+func Get(id string) (Item, error) {
+	return get(id)
+}
+
+func get(id string) (Item, error) {
+	var item Item
+	var err error
 	params := &dynamodb.GetItemInput{
 		TableName: aws.String(tableName),
 		Key: map[string]*dynamodb.AttributeValue{
@@ -40,85 +45,14 @@ func Get(id string) (item Item, err error) {
 	}
 	resp, err := db.GetItem(params)
 	if err != nil {
-		return
+		return item, err
 	}
 	err = dynamodbattribute.UnmarshalMap(resp.Item, &item)
 	if err != nil {
-		return
+		return item, err
 	}
 	item.decode()
-	return
-}
-
-func Put(db *dynamodb.DynamoDB, table, key, value string) error {
-	params := &dynamodb.PutItemInput{
-		Item: map[string]*dynamodb.AttributeValue{
-			"key": &dynamodb.AttributeValue{
-				S: aws.String(key),
-			},
-			"value": &dynamodb.AttributeValue{
-				S: aws.String(value),
-			},
-		},
-		TableName: aws.String(table),
-	}
-	_, err := db.PutItem(params)
-	return err
-}
-
-func get(db *dynamodb.DynamoDB, cluster, key string) string {
-	params := &dynamodb.GetItemInput{
-		Key: map[string]*dynamodb.AttributeValue{
-			"key": {
-				S: aws.String(key),
-			},
-		},
-		TableName: aws.String(cluster),
-	}
-	resp, err := db.GetItem(params)
-	if err != nil {
-		return ""
-	}
-	if resp.Item["value"].S != nil {
-		return *resp.Item["value"].S
-	}
-	return ""
-}
-
-func GetAll(db *dynamodb.DynamoDB, table, searchKey string) ([]string, []string) {
-	items, err := scan(db, table)
-	if err != nil {
-		return make([]string, 0), make([]string, 0)
-	}
-	keys := make([]string, 0)
-	values := make([]string, 0)
-	for _, value := range items {
-		k := *value["key"].S
-		v := *value["value"].S
-		if strings.HasPrefix(k, searchKey) {
-			tKey := strings.TrimPrefix(k, searchKey)
-			keys = append(keys, tKey)
-			values = append(values, v)
-		}
-	}
-	return keys, values
-}
-
-func scan(db *dynamodb.DynamoDB, table string) ([]map[string]*dynamodb.AttributeValue, error) {
-	// TODO use query instead?
-	params := &dynamodb.ScanInput{
-		TableName: aws.String(table),
-	}
-	items := make([]map[string]*dynamodb.AttributeValue, 0)
-	err := db.ScanPages(params,
-		func(page *dynamodb.ScanOutput, lastPage bool) bool {
-			items = append(items, page.Items...)
-			return !lastPage
-		})
-	if err != nil {
-		return nil, err
-	}
-	return items, nil
+	return item, err
 }
 
 // Save saves env vars given a string of vars in form of this=that,this2=that2
@@ -135,11 +69,11 @@ func SaveFromFile(id, app, env, fileName string) error {
 		return err
 	}
 	item := CreateItem(id, app, env, variables)
-	item.encode()
 	return save(item)
 }
 
 func save(item Item) error {
+	item.encode()
 	atr, err := dynamodbattribute.MarshalMap(item)
 	if err != nil {
 		return err
@@ -150,4 +84,95 @@ func save(item Item) error {
 	}
 	_, err = db.PutItem(params)
 	return err
+}
+
+// Update updates configurate of given application with id
+func Update(id, app, env, vars string) error {
+	parsedVars := parseVariables(vars)
+	return update(id, app, env, parsedVars)
+}
+
+// UpdateFromFile updates stuff from a file
+func UpdateFromFile(id, app, env, fileName string) error {
+	vars, err := parseVariablesFromFile(fileName)
+	if err != nil {
+		return err
+	}
+	return update(id, app, env, vars)
+}
+
+func update(id, app, env string, vars []Variable) error {
+	item, err := get(id)
+	if err != nil {
+		if err.Error() != dynamodb.ErrCodeResourceNotFoundException {
+			return err
+		}
+		// Save the item if it doesn't exist already
+		return save(Item{
+			Application: app,
+			ID:          id,
+			Environment: env,
+			Variables:   vars,
+		})
+	}
+
+	for i := 0; i < len(vars); i++ {
+		found := false
+		for j := 0; j < len(item.Variables); j++ {
+			if vars[i].Name == item.Variables[j].Name {
+				found = true
+				item.Variables[j].Value = vars[i].Value
+				break
+			}
+		}
+		if !found { // add variable if not found already
+			item.Variables = append(item.Variables, vars[i])
+		}
+	}
+	return save(item)
+}
+
+// Delete deletes the thing
+func Delete(id string) error {
+	params := &dynamodb.DeleteItemInput{
+		TableName: aws.String(tableName),
+		Key: map[string]*dynamodb.AttributeValue{
+			"id": {
+				S: aws.String(id),
+			},
+		},
+	}
+	_, err := db.DeleteItem(params)
+	return err
+}
+
+// DeleteVars deletes the given variables from the item with id of id
+func DeleteVars(id, variables string) error {
+	vars := parseVariables(variables)
+	return deleteVars(id, vars)
+}
+
+// DeleteVarsFromFile deletes the variables found in the file filepath
+func DeleteVarsFromFile(id, filePath string) error {
+	vars, err := parseVariablesFromFile(filePath)
+	if err != nil {
+		return err
+	}
+	return deleteVars(id, vars)
+}
+
+func deleteVars(id string, vars []Variable) error {
+	item, err := get(id)
+	if err != nil {
+		return err
+	}
+	for i := 0; i < len(vars); i++ {
+		for j := 0; j < len(item.Variables); j++ {
+			if vars[i].Name == item.Variables[j].Name {
+				item.Variables = append(item.Variables[:j], item.Variables[j+1:]...)
+			}
+		}
+	}
+	return save(item)
+
 }

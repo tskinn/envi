@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"os"
 
@@ -16,7 +15,7 @@ func main() {
 	app.Description = "A simple key-value store cli for dynamodb"
 	app.Name = "envi"
 	app.Usage = ""
-	app.UsageText = "envi set --application myapp --environment dev --variables=one=eno,two=owt,three=eerht\n   envi get --key <key>\n   envi --getall --key <key>"
+	app.UsageText = "envi set --application myapp --environment dev --variables=one=eno,two=owt,three=eerht\n   envi get --key <key>\n"
 
 	globalFlags := []cli.Flag{
 		cli.StringFlag{
@@ -56,10 +55,10 @@ func main() {
 		Aliases: []string{"s"},
 		Usage:   "save application configuraton in dynamodb",
 		Action: func(c *cli.Context) error {
-			store.Init(c.String("region"), c.String("table"))
-			if c.IsSet("application") && c.IsSet("environment") && (c.IsSet("variables") || c.IsSet("file")) {
-				tID := c.String("id")
-				if !c.IsSet("id") {
+			if (id != "" || (application != "" && environment != "")) && (variables != "" || filePath != "") {
+				store.Init(awsRegion, tableName)
+				tID := id
+				if id == "" {
 					tID = application + "__" + environment
 				}
 				if filePath != "" && variables != "" {
@@ -70,10 +69,8 @@ func main() {
 				} else if variables != "" {
 					return store.Save(tID, application, environment, variables)
 				}
-				return fmt.Errorf("Bad form")
-				// TODO return error because neither was set
 			}
-			return nil
+			return fmt.Errorf("Bad input")
 		},
 		Flags: []cli.Flag{
 			cli.StringFlag{
@@ -92,26 +89,63 @@ func main() {
 	}
 	setCommand.Flags = append(setCommand.Flags, globalFlags...)
 
+	updateCommand := cli.Command{
+		Name:    "update",
+		Aliases: []string{"u"},
+		Usage:   "update an applications configuration by inserting new vars and updating old vars if specified",
+		Action: func(c *cli.Context) error {
+			if (id != "" || (application != "" && environment != "")) && (variables != "" || filePath != "") {
+				store.Init(awsRegion, tableName)
+				tID := id
+				if tID == "" {
+					tID = application + "__" + environment
+				}
+				if filePath != "" {
+					return store.UpdateFromFile(id, application, environment, filePath)
+				} else if variables != "" {
+					return store.Update(id, application, environment, variables)
+				}
+			}
+			return fmt.Errorf("Input Error")
+		},
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:        "variables, v",
+				Value:       "",
+				Usage:       "env variables to store in the form of key=value,key2=value2,key3=value3",
+				Destination: &variables,
+			},
+			cli.StringFlag{
+				Name:        "file, f",
+				Value:       "",
+				Usage:       "path to a shell file that exports env vars",
+				Destination: &filePath,
+			},
+		},
+	}
+	updateCommand.Flags = append(updateCommand.Flags, globalFlags...)
+
 	getCommand := cli.Command{
 		Name:    "get",
 		Aliases: []string{"g"},
 		Usage:   "get the application configuration for a particular application",
 		Action: func(c *cli.Context) error {
-			store.Init(c.String("region"), c.String("table"))
 			var item store.Item
 			var err error
-			if c.IsSet("id") {
-				item, err = store.Get(c.String("id"))
-			} else if c.IsSet("application") && c.IsSet("environment") {
-				item, err = store.Get(c.String("application") + "__" + c.String("environment"))
-			} else {
-				return errors.New("incorrect flags")
+			if id != "" || (application != "" && environment != "") {
+				store.Init(awsRegion, tableName) // TODO update this i
+				tID := id
+				if tID == "" {
+					tID = application + "__" + environment
+				}
+				item, err = store.Get(id)
+				if err != nil {
+					return err
+				}
+				item.PrintVars(output)
+				return nil
 			}
-			if err != nil {
-				return err
-			}
-			item.PrintVars(output)
-			return nil
+			return fmt.Errorf("Bad input")
 		},
 		Flags: []cli.Flag{
 			cli.StringFlag{
@@ -124,9 +158,49 @@ func main() {
 	}
 	getCommand.Flags = append(getCommand.Flags, globalFlags...)
 
+	deleteCommand := cli.Command{
+		Name:    "delete",
+		Aliases: []string{"d"},
+		Usage:   "delete the application configuration for a particular application",
+		Action: func(c *cli.Context) error {
+			if (id != "" || (application != "" && environment != "")) && (variables != "" || filePath != "") {
+				store.Init(awsRegion, tableName)
+				tID := id
+				if tID == "" {
+					tID = application + "__" + environment
+				}
+				if filePath != "" {
+					return store.DeleteVarsFromFile(id, filePath)
+				} else if variables != "" {
+					return store.DeleteVars(id, variables)
+				} else {
+					return store.Delete(id)
+				}
+			}
+			return fmt.Errorf("Input error")
+		},
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:        "variables, v",
+				Value:       "",
+				Usage:       "env variables to delete in the form of key=value,key2=value2,key3=value3",
+				Destination: &variables,
+			},
+			cli.StringFlag{
+				Name:        "file, f",
+				Value:       "",
+				Usage:       "path to a shell file that contains env vars",
+				Destination: &filePath,
+			},
+		},
+	}
+	deleteCommand.Flags = append(deleteCommand.Flags, globalFlags...)
+
 	app.Commands = []cli.Command{
 		setCommand,
 		getCommand,
+		updateCommand,
+		deleteCommand,
 	}
 
 	err := app.Run(os.Args)
