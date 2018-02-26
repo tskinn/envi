@@ -40,12 +40,16 @@ func (item *Item) printPlain() {
 }
 
 func (item *Item) printJSON() {
-	vars, err := json.MarshalIndent(item.Variables, "", "   ")
+	// The default json.unmarshal HTML escapes
+	// We create a custom encoder so we don't have to HTML escape
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetEscapeHTML(false)
+	encoder.SetIndent("", "   ")
+	err := encoder.Encode(item.Variables)
 	if err != nil {
 		// TODO debug print error or something
 		fmt.Println("ERROR: ", err)
 	}
-	fmt.Println(string(vars))
 }
 
 // TODO this is pretty darn primitive so make it more robust
@@ -107,20 +111,20 @@ func (i *Item) String() string {
 }
 
 // attempt to decode the Variable values from base64
-func (i *Item) decode() {
-	fmt.Println("decoding")
-	for j := range i.Variables {
-		tmp, err := base64.StdEncoding.DecodeString(i.Variables[j].Value)
+func (item *Item) decode() {
+	// TODO add debug maybe?
+	for j := range item.Variables {
+		tmp, err := base64.StdEncoding.DecodeString(item.Variables[j].Value)
 		if err == nil {
-			i.Variables[j].Value = string(tmp)
+			item.Variables[j].Value = string(tmp)
 		}
 	}
 }
 
-func (i *Item) encode() {
-	fmt.Println("encoding")
-	for j := range i.Variables {
-		tmp := base64.StdEncoding.EncodeToString([]byte(i.Variables[j].Value))
-		i.Variables[j].Value = tmp
+func (item *Item) encode() {
+	// TODO add debug maybe?
+	for j := range item.Variables {
+		tmp := base64.StdEncoding.EncodeToString([]byte(item.Variables[j].Value))
+		item.Variables[j].Value = tmp
 	}
 }
