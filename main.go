@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/tskinn/envi-cli/store"
+	"github.com/tskinn/envi/store"
 	"github.com/urfave/cli"
 )
 
@@ -12,22 +12,28 @@ func main() {
 	var tableName, awsRegion, application, environment, id, variables, filePath, output string
 	app := cli.NewApp()
 
-	app.Description = "A simple key-value store cli for dynamodb"
+	app.Description = "A simple application configuration store cli backed by dynamodb"
 	app.Name = "envi"
 	app.Usage = ""
-	app.UsageText = "envi set --application myapp --environment dev --variables=one=eno,two=owt,three=eerht\n   envi get --key <key>\n"
+	app.UsageText = `envi set --application myapp --environment dev --variables=one=eno,two=owt,three=eerht
+   envi s -a myapp -e dev -v one=eno,two=owt,three=eerht
+   envi s --id myapp__dev -f path/to/file/with/exported/vars
+   envi get --application myapp --environment dev
+   envi g -a myapp -e dev -o json`
 
 	globalFlags := []cli.Flag{
 		cli.StringFlag{
 			Name:        "table, t",
 			Value:       "envi",
 			Usage:       "name of the dynamodb to store values",
+			EnvVar:      "ENVI_TABLE",
 			Destination: &tableName,
 		},
 		cli.StringFlag{
 			Name:        "region, r",
 			Value:       "us-east-1",
 			Usage:       "name of the aws region in which dynamodb table resides",
+			EnvVar:      "ENVI_REGION",
 			Destination: &awsRegion,
 		},
 		cli.StringFlag{
