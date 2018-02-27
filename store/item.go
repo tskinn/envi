@@ -28,6 +28,8 @@ func (item *Item) PrintVars(format string) {
 	format = strings.ToLower(format)
 	if format == "json" {
 		item.printJSON()
+	} else if format == "sh" {
+		item.printShell()
 	} else {
 		item.printPlain()
 	}
@@ -49,6 +51,12 @@ func (item *Item) printJSON() {
 	if err != nil {
 		// TODO debug print error or something
 		fmt.Println("ERROR: ", err)
+	}
+}
+
+func (item *Item) printShell() {
+	for i := range item.Variables {
+		fmt.Printf("export %s=%s\n", item.Variables[i].Name, item.Variables[i].Value)
 	}
 }
 
