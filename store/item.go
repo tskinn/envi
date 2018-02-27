@@ -81,14 +81,15 @@ func parseVariablesFromFile(fileName string) ([]Variable, error) {
 		line := scanner.Text()
 		line = strings.TrimPrefix(line, "export") // remove export if exists
 		line = strings.TrimLeft(line, " \t")      // remove all spaces on left
-		words := strings.SplitN(line, "=", 2)
-		if len(words) == 2 {
+		words := strings.SplitN(line, "=", 2)     // split into no more than 2 strings
+		if len(words) != 2 {                      // should be two strings
 			// Skip. Something went wrong
 			// TODO do we want to print an error?
 			continue
 		}
 		variables = append(variables, Variable{Name: words[0], Value: words[1]})
 	}
+
 	if err = scanner.Err(); err != nil {
 		return variables, err
 	}

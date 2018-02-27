@@ -144,7 +144,7 @@ func main() {
 				if tID == "" {
 					tID = application + "__" + environment
 				}
-				item, err = store.Get(id)
+				item, err = store.Get(tID)
 				if err != nil {
 					return err
 				}
