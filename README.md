@@ -27,9 +27,8 @@ change the default DynamoDB table and AWS region or they can be set
 with a flag.
 
 
-
 # Usage
-``` shell
+``` text
 NAME:
    envi
 
@@ -62,7 +61,7 @@ GLOBAL OPTIONS:
 
 ### get
 
-``` shell
+``` text
 NAME:
    envi get - get the application configuration for a particular application
 
@@ -80,7 +79,7 @@ OPTIONS:
 
 ### set
 
-``` shell
+``` text
 NAME:
    envi set - save application configuraton in dynamodb
 
@@ -99,7 +98,7 @@ OPTIONS:
 
 ### update
 
-``` shell
+``` text
 NAME:
    envi update - update an applications configuration by inserting new vars and updating old vars if specified
 
