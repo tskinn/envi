@@ -36,7 +36,6 @@ USAGE:
    envi set --application myapp --environment dev --variables=one=eno,two=owt,three=eerht
    envi s -a myapp -e dev -v one=eno,two=owt,three=eerht
    envi s -i myapp__dev -f path/to/file/with/exported/vars
-   envi get --application myapp --environment dev
    envi g -a myapp -e dev -o json
 
 VERSION:
@@ -61,6 +60,14 @@ GLOBAL OPTIONS:
 
 ### get
 
+The `get` command is self expalatory. Besides the default output
+format (simple key=value) there are two other options: `json` and
+`sh`. The `json` option prints an array of objects containg and name
+and value (this is the format used in AWS ECS Task Definition
+templates). The `sh` option is the same as the regulare output but
+`export ` is added to the beginning of each line so as to more
+convenient in using the env vars in a cli.
+
 ``` text
 NAME:
    envi get - get the application configuration for a particular application
@@ -78,6 +85,14 @@ OPTIONS:
 ```
 
 ### set
+
+Use with CAUTION.
+
+Use `set` to create new configurations. Set overrides all variables so
+if one attempts to set a config with only one variable, all current
+variables will be deleted and replaced with the single new variable.
+
+If not creating a new config, it is better to use the `update` command.
 
 ``` text
 NAME:
@@ -98,6 +113,18 @@ OPTIONS:
 
 ### update
 
+The `update` command will override provided variables while leaving
+current variables untouched.
+
+Here is an example of how to update a single variable:
+
+``` text
+envi u -i omega__staging -v OLD_VAR=new-value
+```
+
+The above command will replace the OLD_VAR value with "new-value" and
+leave all other unmentioned variables untouched.
+
 ``` text
 NAME:
    envi update - update an applications configuration by inserting new vars and updating old vars if specified
@@ -108,6 +135,33 @@ USAGE:
 OPTIONS:
    --variables value, -v value    env variables to store in the form of key=value,key2=value2,key3=value3
    --file value, -f value         path to a shell file that exports env vars
+   --table value, -t value        name of the dynamodb to store values (default: "envi") [$ENVI_TABLE]
+   --region value, -r value       name of the aws region in which dynamodb table resides (default: "us-east-1") [$ENVI_REGION]
+   --id value, -i value           id of the application environment combo; if id is not provided then application__environment is used as the id
+   --application value, -a value  name of the application
+   --environment value, -e value  name of the environment
+```
+
+### delete
+
+The `delete` command will delete variables from a config if variables
+are provided. If no variables are provided the entire config will be
+deleted.
+
+When deleting variables provide only the names of the variables to be
+deleted. The same goes for files containing the env vars. The file
+should only have the names of the vars to be deleted.
+
+``` text
+NAME:
+   envi delete - delete the application configuration for a particular application
+
+USAGE:
+   envi delete [command options] [arguments...]
+
+OPTIONS:
+   --variables value, -v value    env variables to delete in the form of key=value,key2=value2,key3=value3
+   --file value, -f value         path to a shell file that contains env vars
    --table value, -t value        name of the dynamodb to store values (default: "envi") [$ENVI_TABLE]
    --region value, -r value       name of the aws region in which dynamodb table resides (default: "us-east-1") [$ENVI_REGION]
    --id value, -i value           id of the application environment combo; if id is not provided then application__environment is used as the id

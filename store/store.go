@@ -56,19 +56,19 @@ func get(id string) (Item, error) {
 }
 
 // Save saves env vars given a string of vars in form of this=that,this2=that2
-func Save(id, app, env, vars string) error {
-	variables := parseVariables(vars)
-	item := CreateItem(id, app, env, variables)
+func Save(id, vars string) error {
+	variables := parseVariables(vars, false)
+	item := CreateItem(id, variables)
 	return save(item)
 }
 
 // SaveFromFile gets env vars from a env file and saves to dynamo
-func SaveFromFile(id, app, env, fileName string) error {
-	variables, err := parseVariablesFromFile(fileName)
+func SaveFromFile(id, fileName string) error {
+	variables, err := parseVariablesFromFile(fileName, false)
 	if err != nil {
 		return err
 	}
-	item := CreateItem(id, app, env, variables)
+	item := CreateItem(id, variables)
 	return save(item)
 }
 
@@ -87,21 +87,21 @@ func save(item Item) error {
 }
 
 // Update updates configurate of given application with id
-func Update(id, app, env, vars string) error {
-	parsedVars := parseVariables(vars)
-	return update(id, app, env, parsedVars)
+func Update(id, vars string) error {
+	parsedVars := parseVariables(vars, false)
+	return update(id, parsedVars)
 }
 
 // UpdateFromFile updates stuff from a file
-func UpdateFromFile(id, app, env, fileName string) error {
-	vars, err := parseVariablesFromFile(fileName)
+func UpdateFromFile(id, fileName string) error {
+	vars, err := parseVariablesFromFile(fileName, false)
 	if err != nil {
 		return err
 	}
-	return update(id, app, env, vars)
+	return update(id, vars)
 }
 
-func update(id, app, env string, vars []Variable) error {
+func update(id string, vars []Variable) error {
 	item, err := get(id)
 	if err != nil {
 		if err.Error() != dynamodb.ErrCodeResourceNotFoundException {
@@ -109,10 +109,8 @@ func update(id, app, env string, vars []Variable) error {
 		}
 		// Save the item if it doesn't exist already
 		return save(Item{
-			Application: app,
-			ID:          id,
-			Environment: env,
-			Variables:   vars,
+			ID:        id,
+			Variables: vars,
 		})
 	}
 
@@ -148,13 +146,13 @@ func Delete(id string) error {
 
 // DeleteVars deletes the given variables from the item with id of id
 func DeleteVars(id, variables string) error {
-	vars := parseVariables(variables)
+	vars := parseVariables(variables, true)
 	return deleteVars(id, vars)
 }
 
 // DeleteVarsFromFile deletes the variables found in the file filepath
 func DeleteVarsFromFile(id, filePath string) error {
-	vars, err := parseVariablesFromFile(filePath)
+	vars, err := parseVariablesFromFile(filePath, true)
 	if err != nil {
 		return err
 	}

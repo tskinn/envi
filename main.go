@@ -61,22 +61,18 @@ func main() {
 		Aliases: []string{"s"},
 		Usage:   "save application configuraton in dynamodb",
 		Action: func(c *cli.Context) error {
-			if (id != "" || (application != "" && environment != "")) && (variables != "" || filePath != "") {
-				store.Init(awsRegion, tableName)
-				tID := id
-				if id == "" {
-					tID = application + "__" + environment
-				}
-				if filePath != "" && variables != "" {
-					fmt.Println("Cannot do that")
-					// TODO print error not supposed to have both set at same time
-				} else if filePath != "" {
-					return store.SaveFromFile(tID, application, environment, filePath)
-				} else if variables != "" {
-					return store.Save(tID, application, environment, variables)
-				}
+			var err error
+			id, err = getID(id, application, environment)
+			if err != nil {
+				return err
 			}
-			return fmt.Errorf("Bad input")
+			store.Init(awsRegion, tableName)
+			if filePath != "" {
+				return store.SaveFromFile(id, filePath)
+			} else if variables != "" {
+				return store.Save(id, variables)
+			}
+			return fmt.Errorf("must provide variables or a path to a file containing variables")
 		},
 		Flags: []cli.Flag{
 			cli.StringFlag{
@@ -100,19 +96,18 @@ func main() {
 		Aliases: []string{"u"},
 		Usage:   "update an applications configuration by inserting new vars and updating old vars if specified",
 		Action: func(c *cli.Context) error {
-			if (id != "" || (application != "" && environment != "")) && (variables != "" || filePath != "") {
-				store.Init(awsRegion, tableName)
-				tID := id
-				if tID == "" {
-					tID = application + "__" + environment
-				}
-				if filePath != "" {
-					return store.UpdateFromFile(id, application, environment, filePath)
-				} else if variables != "" {
-					return store.Update(id, application, environment, variables)
-				}
+			var err error
+			id, err = getID(id, application, environment)
+			if err != nil {
+				return err
 			}
-			return fmt.Errorf("Input Error")
+			store.Init(awsRegion, tableName)
+			if filePath != "" {
+				return store.UpdateFromFile(id, filePath)
+			} else if variables != "" {
+				return store.Update(id, variables)
+			}
+			return fmt.Errorf("must provide variables or a path to a file containing variables")
 		},
 		Flags: []cli.Flag{
 			cli.StringFlag{
@@ -138,20 +133,17 @@ func main() {
 		Action: func(c *cli.Context) error {
 			var item store.Item
 			var err error
-			if id != "" || (application != "" && environment != "") {
-				store.Init(awsRegion, tableName) // TODO update this i
-				tID := id
-				if tID == "" {
-					tID = application + "__" + environment
-				}
-				item, err = store.Get(tID)
-				if err != nil {
-					return err
-				}
-				item.PrintVars(output)
-				return nil
+			id, err = getID(id, application, environment)
+			if err != nil {
+				return err
 			}
-			return fmt.Errorf("Bad input")
+			store.Init(awsRegion, tableName)
+			item, err = store.Get(id)
+			if err != nil {
+				return err
+			}
+			item.PrintVars(output)
+			return nil
 		},
 		Flags: []cli.Flag{
 			cli.StringFlag{
@@ -169,21 +161,19 @@ func main() {
 		Aliases: []string{"d"},
 		Usage:   "delete the application configuration for a particular application",
 		Action: func(c *cli.Context) error {
-			if (id != "" || (application != "" && environment != "")) && (variables != "" || filePath != "") {
-				store.Init(awsRegion, tableName)
-				tID := id
-				if tID == "" {
-					tID = application + "__" + environment
-				}
-				if filePath != "" {
-					return store.DeleteVarsFromFile(id, filePath)
-				} else if variables != "" {
-					return store.DeleteVars(id, variables)
-				} else {
-					return store.Delete(id)
-				}
+			var err error
+			id, err = getID(id, application, environment)
+			if err != nil {
+				return err
 			}
-			return fmt.Errorf("Input error")
+			store.Init(awsRegion, tableName)
+			if filePath != "" {
+				return store.DeleteVarsFromFile(id, filePath)
+			} else if variables != "" {
+				return store.DeleteVars(id, variables)
+			} else {
+				return store.Delete(id)
+			}
 		},
 		Flags: []cli.Flag{
 			cli.StringFlag{
@@ -213,4 +203,15 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 	}
+}
+
+func getID(id, application, environment string) (string, error) {
+	if id == "" && (application == "" || environment == "") {
+		return "", fmt.Errorf("must provide an id or the application name and environment")
+	}
+
+	if id != "" {
+		return id, nil
+	}
+	return application + "__" + environment, nil
 }
