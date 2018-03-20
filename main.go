@@ -9,17 +9,16 @@ import (
 )
 
 func main() {
-	var tableName, awsRegion, application, environment, id, variables, filePath, output string
+	var tableName, awsRegion, id, variables, filePath, output string
 	app := cli.NewApp()
 
 	app.Description = "A simple application configuration store cli backed by dynamodb"
 	app.Name = "envi"
 	app.Usage = ""
-	app.UsageText = `envi set --application myapp --environment dev --variables=one=eno,two=owt,three=eerht
-   envi s -a myapp -e dev -v one=eno,two=owt,three=eerht
-   envi s --id myapp__dev -f path/to/file/with/exported/vars
-   envi get --application myapp --environment dev
-   envi g -a myapp -e dev -o json`
+	app.UsageText = `envi set --id application__environment --variables one=eno,two=owt,three=eerht
+   envi s -i app__dev -e one=eno,two=owt,three=eerht
+   envi get -i app__dev
+   envi g -i app__dev -o json`
 
 	globalFlags := []cli.Flag{
 		cli.StringFlag{
@@ -39,20 +38,8 @@ func main() {
 		cli.StringFlag{
 			Name:        "id, i",
 			Value:       "",
-			Usage:       "id of the application environment combo; if id is not provided then application__environment is used as the id",
+			Usage:       "id of the application environment combo: <app>__<environment>",
 			Destination: &id,
-		},
-		cli.StringFlag{
-			Name:        "application, a",
-			Value:       "",
-			Usage:       "name of the application",
-			Destination: &application,
-		},
-		cli.StringFlag{
-			Name:        "environment, e",
-			Value:       "",
-			Usage:       "name of the environment",
-			Destination: &environment,
 		},
 	}
 
@@ -61,11 +48,10 @@ func main() {
 		Aliases: []string{"s"},
 		Usage:   "save application configuraton in dynamodb",
 		Action: func(c *cli.Context) error {
-			var err error
-			id, err = getID(id, application, environment)
-			if err != nil {
-				return err
+			if id == "" {
+				return fmt.Errorf("must provide id")
 			}
+
 			store.Init(awsRegion, tableName)
 			if filePath != "" {
 				return store.SaveFromFile(id, filePath)
@@ -76,7 +62,7 @@ func main() {
 		},
 		Flags: []cli.Flag{
 			cli.StringFlag{
-				Name:        "variables, v",
+				Name:        "variables, e",
 				Value:       "",
 				Usage:       "env variables to store in the form of key=value,key2=value2,key3=value3",
 				Destination: &variables,
@@ -96,11 +82,10 @@ func main() {
 		Aliases: []string{"u"},
 		Usage:   "update an applications configuration by inserting new vars and updating old vars if specified",
 		Action: func(c *cli.Context) error {
-			var err error
-			id, err = getID(id, application, environment)
-			if err != nil {
-				return err
+			if id == "" {
+				return fmt.Errorf("must provide id")
 			}
+
 			store.Init(awsRegion, tableName)
 			if filePath != "" {
 				return store.UpdateFromFile(id, filePath)
@@ -111,7 +96,7 @@ func main() {
 		},
 		Flags: []cli.Flag{
 			cli.StringFlag{
-				Name:        "variables, v",
+				Name:        "variables, e",
 				Value:       "",
 				Usage:       "env variables to store in the form of key=value,key2=value2,key3=value3",
 				Destination: &variables,
@@ -131,14 +116,12 @@ func main() {
 		Aliases: []string{"g"},
 		Usage:   "get the application configuration for a particular application",
 		Action: func(c *cli.Context) error {
-			var item store.Item
-			var err error
-			id, err = getID(id, application, environment)
-			if err != nil {
-				return err
+			if id == "" {
+				return fmt.Errorf("must provide id")
 			}
+
 			store.Init(awsRegion, tableName)
-			item, err = store.Get(id)
+			item, err := store.Get(id)
 			if err != nil {
 				return err
 			}
@@ -161,10 +144,8 @@ func main() {
 		Aliases: []string{"d"},
 		Usage:   "delete the application configuration for a particular application",
 		Action: func(c *cli.Context) error {
-			var err error
-			id, err = getID(id, application, environment)
-			if err != nil {
-				return err
+			if id == "" {
+				return fmt.Errorf("Must provide id")
 			}
 			store.Init(awsRegion, tableName)
 			if filePath != "" {
@@ -177,7 +158,7 @@ func main() {
 		},
 		Flags: []cli.Flag{
 			cli.StringFlag{
-				Name:        "variables, v",
+				Name:        "variables, e",
 				Value:       "",
 				Usage:       "env variables to delete in the form of key=value,key2=value2,key3=value3",
 				Destination: &variables,
@@ -203,15 +184,4 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 	}
-}
-
-func getID(id, application, environment string) (string, error) {
-	if id == "" && (application == "" || environment == "") {
-		return "", fmt.Errorf("must provide an id or the application name and environment")
-	}
-
-	if id != "" {
-		return id, nil
-	}
-	return application + "__" + environment, nil
 }

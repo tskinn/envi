@@ -169,3 +169,21 @@ OPTIONS:
    --environment value, -e value  name of the environment
 ```
 
+## Testing
+
+There is a script to run the go tests and to test the basic
+functionality of envi called `run_tests.sh`. This script
+assumes privileged AWS credentials are setup in the environment. From
+the root of the project simply run:
+
+``` text
+bash run_tests.sh
+```
+
+To just run go tests:
+
+``` text
+cd store
+go test
+```
+

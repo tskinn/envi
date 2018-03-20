@@ -40,7 +40,7 @@ func (item *Item) printPlain() {
 }
 
 func (item *Item) printJSON() {
-	// The default json.unmarshal HTML escapes
+	// The default json.unmarshal HTML escapes the string
 	// We create a custom encoder so we don't have to HTML escape
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetEscapeHTML(false)
@@ -60,55 +60,64 @@ func (item *Item) printShell() {
 
 // TODO this is pretty darn primitive so make it more robust
 // support other formats and what not
-func parseVariables(variables string, nameOnly bool) []Variable {
-	split := strings.Split(variables, ",")
-	vars := make([]Variable, len(split))
-	for i := range split {
+func parseVariables(variablesRaw string, nameOnly bool) []Variable {
+	keyValuePairs := strings.Split(variablesRaw, ",")
+	variables := make([]Variable, len(keyValuePairs))
+	for i, keyValuePair := range keyValuePairs {
 		if nameOnly {
-			vars[i] = Variable{
-				Name:  string(split[i]),
+			variables[i] = Variable{
+				Name:  string(keyValuePair),
 				Value: "",
 			}
 		} else {
-			j := strings.Index(split[i], "=")
-			vars[i] = Variable{
-				Name:  string(split[i][:j]),
-				Value: string(split[i][j+1:]),
+			indexOfSeparator := strings.Index(keyValuePair, "=")
+			variables[i] = Variable{
+				Name:  string(keyValuePair[:indexOfSeparator]),
+				Value: string(keyValuePair[indexOfSeparator+1:]),
 			}
 		}
 	}
-	return vars
+	return variables
 }
 
 func parseVariablesFromFile(fileName string, nameOnly bool) ([]Variable, error) {
-	variables := make([]Variable, 0)
 	file, err := os.Open(fileName)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
 
-	scanner := bufio.NewScanner(file)
+	fileScanner := bufio.NewScanner(file)
+	return parseVariablesFromScanner(fileScanner, nameOnly)
+}
+
+func parseVariablesFromScanner(scanner *bufio.Scanner, nameOnly bool) ([]Variable, error) {
+	variables := make([]Variable, 0)
+
 	for scanner.Scan() {
 		// Parse line
 		line := scanner.Text()
 		line = strings.TrimPrefix(line, "export") // remove export if exists
 		line = strings.TrimLeft(line, " \t")      // remove all spaces on left
-		var words []string
-		if nameOnly {
-			words = []string{line, ""}
-		} else {
-			words = strings.SplitN(line, "=", 2) // split into no more than 2 strings
-			if len(words) != 2 {                 // should be two strings
-				// Skip. Something went wrong
-				// TODO do we want to print an error?
-				continue
-			}
+		line = strings.TrimRight(line, " \t\n")   // trim right
+		if line == "" || line[0] == byte('#') {   // try to skip comments and empty lines
+			continue
 		}
-		variables = append(variables, Variable{Name: words[0], Value: words[1]})
+		var name, value string
+		if nameOnly {
+			name = line
+		} else {
+			indexOfSeparator := strings.Index(line, "=") // split into no more than 2 strings
+			if indexOfSeparator < 0 {
+				return variables, fmt.Errorf("error parsing file")
+			}
+			name = line[:indexOfSeparator]
+			value = line[indexOfSeparator+1:]
+		}
+		variables = append(variables, Variable{Name: name, Value: value})
 	}
 
-	if err = scanner.Err(); err != nil {
+	if err := scanner.Err(); err != nil {
 		return variables, err
 	}
 	return variables, nil
@@ -130,18 +139,18 @@ func (item *Item) String() string {
 // attempt to decode the Variable values from base64
 func (item *Item) decode() {
 	// TODO add debug maybe?
-	for j := range item.Variables {
-		tmp, err := base64.StdEncoding.DecodeString(item.Variables[j].Value)
+	for i := range item.Variables {
+		decodedValue, err := base64.StdEncoding.DecodeString(item.Variables[i].Value)
 		if err == nil {
-			item.Variables[j].Value = string(tmp)
+			item.Variables[i].Value = string(decodedValue)
 		}
 	}
 }
 
 func (item *Item) encode() {
 	// TODO add debug maybe?
-	for j := range item.Variables {
-		tmp := base64.StdEncoding.EncodeToString([]byte(item.Variables[j].Value))
-		item.Variables[j].Value = tmp
+	for i := range item.Variables {
+		encodedValue := base64.StdEncoding.EncodeToString([]byte(item.Variables[i].Value))
+		item.Variables[i].Value = encodedValue
 	}
 }

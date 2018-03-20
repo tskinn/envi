@@ -5,12 +5,13 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
 )
 
 var (
 	region    string
 	tableName string
-	db        *dynamodb.DynamoDB
+	db        dynamodbiface.DynamoDBAPI
 )
 
 // DynamodbItem is not what we want?
@@ -19,7 +20,8 @@ type DynamodbItem struct {
 	Value string `dynamodbav:"value"`
 }
 
-// Init inits some mstuff
+// Init sets up connection to dynamodb. This must be
+// called before using any other functions in the store package.
 func Init(regionName, table string) {
 	region = regionName
 	tableName = table
@@ -27,7 +29,12 @@ func Init(regionName, table string) {
 	db = dynamodb.New(sesh)
 }
 
-// Get gets the thing ok
+// SetDB allows user to set db. Created for testing mostly
+func SetDB(newDB dynamodbiface.DynamoDBAPI) {
+	db = newDB
+}
+
+// Get gets the item that has an id of 'id'
 func Get(id string) (Item, error) {
 	return get(id)
 }
@@ -104,14 +111,14 @@ func UpdateFromFile(id, fileName string) error {
 func update(id string, vars []Variable) error {
 	item, err := get(id)
 	if err != nil {
-		if err.Error() != dynamodb.ErrCodeResourceNotFoundException {
-			return err
-		}
 		// Save the item if it doesn't exist already
-		return save(Item{
-			ID:        id,
-			Variables: vars,
-		})
+		if err.Error() == dynamodb.ErrCodeResourceNotFoundException {
+			return save(Item{
+				ID:        id,
+				Variables: vars,
+			})
+		}
+		return err
 	}
 
 	for i := 0; i < len(vars); i++ {
@@ -130,7 +137,7 @@ func update(id string, vars []Variable) error {
 	return save(item)
 }
 
-// Delete deletes the thing
+// Delete deletes the entire item the an id of 'id'
 func Delete(id string) error {
 	params := &dynamodb.DeleteItemInput{
 		TableName: aws.String(tableName),
@@ -172,5 +179,4 @@ func deleteVars(id string, vars []Variable) error {
 		}
 	}
 	return save(item)
-
 }
